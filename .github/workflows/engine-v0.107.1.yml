@@ -1,0 +1,33 @@
+# Asserts that the first DAG run on a FRESH database reaches a terminal
+# run-level status. On hatchet-lite v0.107.1 it does not, so this workflow is
+# RED while hatchet-dev/hatchet#4974 is open — the failing step's log shows the
+# check.sql table (dag 1 QUEUED, misclassified=t) and "FAIL: DAG 1 stuck".
+# Re-run it on demand with `engine_image` pointed at a candidate fix build;
+# green means fixed.
+name: engine v0.107.1
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      engine_image:
+        description: hatchet-lite image to test
+        default: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.1
+jobs:
+  dag-status-finalizes:
+    runs-on: ubuntu-latest
+    env:
+      ENGINE_IMAGE: ${{ inputs.engine_image || 'ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.1' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: make up wait token
+      - name: run the 3-step DAG twice (dag 1 collides with task 1; dag 2 does not)
+        run: make run && make run
+      - name: show DAG statuses
+        run: make check
+      - name: "assert: DAG 1 reached a terminal status"
+        run: make assert-fixed
+      - if: always()
+        run: make down

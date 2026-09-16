@@ -1,0 +1,29 @@
+# CONTROL: same code, same SDK, engine v0.101.27 — the first DAG finalizes, so
+# this stays GREEN. Compare with engine-v0.107.1.yml.
+name: engine v0.101.27 (control)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      engine_image:
+        description: hatchet-lite image to test
+        default: ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.101.27
+jobs:
+  dag-status-finalizes:
+    runs-on: ubuntu-latest
+    env:
+      ENGINE_IMAGE: ${{ inputs.engine_image || 'ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.101.27' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - run: make up wait token
+      - name: run the 3-step DAG twice (dag 1 collides with task 1; dag 2 does not)
+        run: make run && make run
+      - name: show DAG statuses
+        run: make check
+      - name: "assert: DAG 1 reached a terminal status"
+        run: make assert-fixed
+      - if: always()
+        run: make down

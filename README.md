@@ -1,10 +1,10 @@
 # hatchet-dag-status-repro
 
-[![repro](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/repro.yml/badge.svg)](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/repro.yml)
+[![engine v0.107.1](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/engine-v0.107.1.yml/badge.svg)](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/engine-v0.107.1.yml) [![engine v0.101.27 (control)](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/engine-v0.101.27.yml/badge.svg)](https://github.com/khanakia/hatchet-dag-status-repro/actions/workflows/engine-v0.101.27.yml)
 
 Minimal, self-contained reproduction for [hatchet-dev/hatchet#4974](https://github.com/hatchet-dev/hatchet/issues/4974): on hatchet-lite **v0.106.5+** a DAG run whose id collides with one of its own task ids never reaches a terminal run-level status — its tasks all complete, but `v1_dags_olap.readable_status` (and the REST `run.status`) stays `QUEUED` forever. On a **fresh database** this is guaranteed for the first DAG run, because `v1_dag_id_seq` and `v1_task_id_seq` both start at 1.
 
-The CI badge above is the live verdict: the `bug` job passes while the bug is present on `v0.107.1`; the `control` job passes because `v0.101.27` finalizes the same DAG.
+The badges are the live verdict. Both workflows assert the same thing — *the first DAG run on a fresh database reaches a terminal status* — so **red on v0.107.1 means the bug is present** (open the failing step to see the `QUEUED` row and `FAIL: DAG 1 stuck`), and green on v0.101.27 is the control. When an engine build fixes it, re-run the v0.107.1 workflow with its `engine_image` input pointed at that build and it turns green.
 
 ## Run it (docker + go, ~2 minutes)
 
@@ -34,7 +34,8 @@ DAG 1 stays `QUEUED` indefinitely while all three of its tasks are `COMPLETED`. 
 | `main.go` | 3-step `WithParents` DAG; worker + one trigger in one process; Go SDK v0.107.1 |
 | `check.sql` | the audit query — `misclassified=t` marks a DAG the engine will never finalize |
 | `Makefile` | `repro` / `control` / `assert-bug` / `assert-fixed` / `down`; no other tooling needed |
-| `.github/workflows/repro.yml` | runs both jobs on push and on demand; `workflow_dispatch` takes a `bug_image` input so a candidate fix can be tested by pointing it at a different image |
+| `.github/workflows/engine-v0.107.1.yml` | asserts DAG 1 finalizes on v0.107.1 — red while the bug exists; `workflow_dispatch` input `engine_image` tests a candidate fix |
+| `.github/workflows/engine-v0.101.27.yml` | the same assertion on v0.101.27 — green control |
 
 ## Mechanism (short)
 
