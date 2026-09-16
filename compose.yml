@@ -1,0 +1,36 @@
+# Minimal hatchet-lite + empty Postgres. The DB MUST be fresh: the bug needs
+# v1_dag_id_seq and v1_task_id_seq to both start at 1. `make down` wipes it.
+# ENGINE_IMAGE is set by the Makefile (v0.107.1 = bug, v0.101.27 = control).
+services:
+  postgres:
+    image: postgres:15.6
+    environment:
+      POSTGRES_USER: hatchet
+      POSTGRES_PASSWORD: hatchet
+      POSTGRES_DB: hatchet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hatchet -d hatchet"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  hatchet-lite:
+    image: ${ENGINE_IMAGE:-ghcr.io/hatchet-dev/hatchet/hatchet-lite:v0.107.1}
+    ports:
+      - "${DASH_PORT:-8890}:8888"
+      - "${GRPC_PORT:-7090}:7070"
+    environment:
+      DATABASE_URL: "postgresql://hatchet:hatchet@postgres:5432/hatchet?sslmode=disable"
+      SERVER_GRPC_BIND_ADDRESS: "0.0.0.0"
+      SERVER_GRPC_PORT: "7070"
+      SERVER_GRPC_BROADCAST_ADDRESS: "localhost:${GRPC_PORT:-7090}"
+      SERVER_GRPC_INSECURE: "t"
+      SERVER_AUTH_COOKIE_INSECURE: "t"
+      SERVER_AUTH_COOKIE_DOMAIN: "localhost"
+      SERVER_DEFAULT_ENGINE_VERSION: V1
+    volumes:
+      - hatchet-config:/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  hatchet-config: {}
